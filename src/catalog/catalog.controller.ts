@@ -20,4 +20,8 @@ export class CatalogController {
   findMinimalInfo() {
     return this.catalogService.findMinimalInfo()
   }
+  @Get()
+  findAll() {
+    return this.catalogService.findAll()
+  }
 }

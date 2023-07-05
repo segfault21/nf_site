@@ -19,4 +19,14 @@ export class CatalogService {
       select: { name: true, article: true, id: true },
     });
   }
+  findAll() {
+    return this.prisma.product.findMany({
+      where: {
+        archived: false
+      },
+      orderBy: {name: 'asc'},
+      include,
+      take: 100,
+    })
+  }
 }
