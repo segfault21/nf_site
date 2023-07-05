@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "Store" ADD VALUE 'RESERVE';

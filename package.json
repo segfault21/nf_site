@@ -20,15 +20,26 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
+    "@fintechstudios/eslint-plugin-chai-as-promised": "^3.1.0",
     "@nestjs/common": "^10.0.0",
     "@nestjs/core": "^10.0.0",
+    "@nestjs/event-emitter": "^2.0.0",
     "@nestjs/platform-express": "^10.0.0",
+    "@nestjs/platform-ws": "^10.0.5",
+    "@nestjs/websockets": "^10.0.5",
+    "@prisma/client": "^4.16.2",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.0",
     "compression": "^1.7.4",
     "dotenv": "^16.3.1",
+    "eslint-plugin-jsdoc": "^46.4.3",
+    "eslint-plugin-mocha": "^10.1.0",
+    "mocha": "^10.2.0",
     "path": "^0.12.7",
     "prisma": "^4.16.2",
     "reflect-metadata": "^0.1.13",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "ws": "^8.13.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",

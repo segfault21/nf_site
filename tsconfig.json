@@ -6,16 +6,18 @@
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
-    "target": "ES2021",
-    "sourceMap": true,
+    "target": "es2017",
     "outDir": "./dist",
     "baseUrl": "./",
     "incremental": true,
+    "esModuleInterop": true,
     "skipLibCheck": true,
-    "strictNullChecks": false,
-    "noImplicitAny": false,
-    "strictBindCallApply": false,
-    "forceConsistentCasingInFileNames": false,
-    "noFallthroughCasesInSwitch": false
+    "sourceMap": true,
+    "inlineSources": true,
+    "sourceRoot": "/",
+    "moduleResolution": "nodenext"
+  },
+  "watchOptions": {
+    "excludeDirectories": [".msCache", "img"]
   }
 }

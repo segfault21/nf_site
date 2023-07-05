@@ -1,0 +1,31 @@
+parser: '@typescript-eslint/parser'
+parserOptions:
+  project: tsconfig.json
+  sourceType: module
+plugins:
+  - '@typescript-eslint/eslint-plugin'
+  - mocha
+extends:
+  - plugin:@typescript-eslint/recommended
+  - plugin:mocha/recommended
+root: true
+env:
+  node: true
+  jest: true
+ignorePatterns:
+  - '.eslintrc.js'
+  - '.msCache'
+rules:
+  linebreak-style: [error, unix]
+  '@typescript-eslint/interface-name-prefix': off
+  '@typescript-eslint/explicit-function-return-type': off
+  '@typescript-eslint/explicit-module-boundary-types': off
+  '@typescript-eslint/no-explicit-any': off
+  '@typescript-eslint/no-var-requires': off
+  '@typescript-eslint/ban-types': off
+  '@typescript-eslint/no-floating-promises': error
+  no-console: warn
+  'no-extra-semi': 'off'
+  '@typescript-eslint/no-extra-semi': 'off'
+  mocha/no-setup-in-describe: off
+  mocha/no-exclusive-tests: error

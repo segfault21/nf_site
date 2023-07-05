@@ -11,9 +11,24 @@ import { DolyameModule } from './dolyame/dolyame.module';
 import { MsModule } from './ms/ms.module';
 import { OrdersModule } from './orders/orders.module';
 import { TasksModule } from './tasks/tasks.module';
+import { PrismaModule } from './prisma/prisma.module';
+import { WsModule } from './ws/ws.module';
 
 @Module({
-  imports: [AuthModule, UserModule, CartModule, CatalogModule, CmsModule, DashboardModule, DolyameModule, MsModule, OrdersModule, TasksModule],
+  imports: [
+    AuthModule,
+    UserModule,
+    CartModule,
+    CatalogModule,
+    CmsModule,
+    DashboardModule,
+    DolyameModule,
+    MsModule,
+    OrdersModule,
+    TasksModule,
+    PrismaModule,
+    WsModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

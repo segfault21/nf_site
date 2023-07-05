@@ -1,0 +1,1179 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "darwin", "debian-openssl-1.1.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Acceptance {
+  id             String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  createdAt      DateTime        @default(now()) @db.Timestamp(6)
+  updatedAt      DateTime        @default(now()) @updatedAt @db.Timestamp(6)
+  comment        String?         @db.VarChar
+  userId         String          @db.Uuid
+  batchId        String          @unique() @db.Uuid
+  number         Int             @default(0)
+  batch          Batch           @relation(fields: [batchId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user           User            @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  acceptanceLogs AcceptanceLog[]
+
+  sewingItems    SewingItem[]
+  ItemActionsLog ItemActionsLog[]
+}
+
+model AcceptanceLog {
+  id String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+
+  comment      String?             @db.VarChar
+  action       AcceptanceLogAction
+  userId       String              @db.Uuid
+  acceptanceId String              @db.Uuid
+  sewingItemId String?             @db.Uuid
+
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamp(6)
+
+  sewingItem SewingItem? @relation(fields: [sewingItemId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  acceptance Acceptance  @relation(fields: [acceptanceId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user       User        @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+enum AcceptanceLogAction {
+  CREATE
+  COMMENT
+  COLLECT_ONE
+  FAIL_ONE
+}
+
+model Batch {
+  number               Int              @default(autoincrement())
+  comment              String?          @db.VarChar
+  id                   String           @id() @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  createdAt            DateTime         @default(now()) @db.Timestamp(6)
+  updatedAt            DateTime         @default(now()) @db.Timestamp(6)
+  userId               String?          @db.Uuid
+  status               BatchStatus      @default(CREATED)
+  type                 batch_type_enum  @default(default)
+  canAddItems          Boolean          @default(true)
+  store                Store            @default(BASE)
+  contractor           Contractor       @default(WORKSHOP)
+  user                 User?            @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  acceptance           Acceptance?
+  batchLogs            BatchLog[]       @relation("batch")
+  mentionedInBatchLogs BatchLog[]       @relation("newBatch")
+  itemActionsLog       ItemActionsLog[]
+  storedItem           StoredItem[]
+  sewingItems          SewingItem[]
+
+  @@index([number])
+  @@index([number, type])
+  @@index([type])
+}
+
+model Material {
+  id        String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  number    Int             @default(autoincrement())
+  status    MaterialStatus  @default(CREATED)
+  store     materialStore   @default(ONLINE_SHOPS_MATERIAL)
+  items     MaterialItems[]
+  createdAt DateTime        @default(now()) @db.Timestamp(6)
+  updatedAt DateTime        @default(now()) @updatedAt @db.Timestamp(6)
+}
+
+model MaterialItems {
+  id         String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name       String?
+  article    String?
+  quantity   String?
+  units      materialUnits @default(quantity)
+  material   Material      @relation(fields: [materialId], references: [id])
+  materialId String        @db.Uuid
+}
+
+model BatchLog {
+  id           String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  productNames String[]
+  comment      String?
+  action       BatchLogAction
+
+  batchId    String  @db.Uuid
+  newBatchId String? @db.Uuid
+  userId     String? @db.Uuid
+
+  newBatch Batch? @relation("newBatch", fields: [newBatchId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  batch    Batch  @relation("batch", fields: [batchId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  user     User?  @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamp(6)
+}
+
+enum BatchLogAction {
+  CREATE
+  SEPARATE
+  EXTEND
+  COMMENT
+  ACCEPT_ALL
+  SEW_ONE
+  UNSEW_ONE
+  DELETE_ONE
+  ACCEPT_ONE
+  PREPARE_ONE
+  PREPARE_ALL
+  SELECT_STORE
+}
+
+model Container {
+  id                           String                         @id(map: "PK_74656f796df3346fa6ec89fa727") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name                         String                         @db.VarChar
+  index                        Int?
+  comment                      String                         @default("") @db.VarChar
+  lastMovedAt                  DateTime?                      @db.Timestamptz(6)
+  stageId                      String?                        @db.Uuid
+  deletedAt                    DateTime?                      @db.Timestamp(6)
+  type                         container_type_enum            @default(default)
+  stage                        Stage?                         @relation(fields: [stageId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_5603a84ae17613a12c91ef17eef")
+  containerLogs                ContainerLog[]
+  container_tags_container_tag container_tags_container_tag[] @relation("containerTocontainer_tags_container_tag")
+  ItemActionsLogs              ItemActionsLog[]
+  items                        StoredItem[]
+  tags                         ContainerTag[]
+
+  @@map("container")
+}
+
+model ContainerLog {
+  id          String     @id(map: "PK_0c495b9e7f79d2725134e226cf3") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  date        DateTime   @default(now()) @db.Timestamp(6)
+  action      String     @default("move") // move, create
+  containerId String?    @db.Uuid
+  fromStageId String?    @db.Uuid
+  toStageId   String?    @db.Uuid
+  userId      String?    @db.Uuid
+  container   Container? @relation(fields: [containerId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_8f0d705f4dbc6f0cfdafd1a0d28")
+  fromStage   Stage?     @relation("container_log_fromStageIdTostage", fields: [fromStageId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "FK_61d0a2b5ac8287b5368757b9334")
+  toStage     Stage?     @relation("container_log_toStageIdTostage", fields: [toStageId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "FK_4692262ca4794e9d526bf19b069")
+  user        User?      @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_bcef0ed01684c60c365559f931e")
+
+  @@map("container_log")
+}
+
+model ContainerTag {
+  id                           String                         @id(map: "PK_f22cf8e4e76b79b6662ce63501d") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  createdAt                    DateTime                       @default(now()) @db.Timestamp(6)
+  updatedAt                    DateTime                       @default(now()) @db.Timestamp(6)
+  name                         String                         @db.VarChar
+  color                        String                         @db.VarChar
+  number                       Int                            @default(autoincrement())
+  container_tags_container_tag container_tags_container_tag[] @relation("container_tagTocontainer_tags_container_tag")
+  containers                   Container[]
+
+  @@map("container_tag")
+}
+
+model ItemActionsLog {
+  id             String      @id(map: "PK_64929e12e54074dd247274bb8fb") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  orderId        Int
+  itemId         Int
+  itemIndex      Int
+  statusFrom     String?     @db.VarChar
+  statusTo       String?     @db.VarChar
+  defectComment  String?     @db.VarChar
+  noFilmComment  String?     @db.VarChar
+  weight         Int?
+  pressCount     Int?
+  date           DateTime    @default(now()) @db.Timestamp(6)
+  userId         String      @db.Uuid
+  containerId    String?     @db.Uuid
+  batchId        String?     @db.Uuid
+  acceptanceId   String?     @db.Uuid
+  itemName       String?
+  paymentType    String?
+  moyskladMoveId String?
+  container      Container?  @relation(fields: [containerId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_fea58fde6d712ab39ea433bd04a")
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "FK_035ccacb36d9311de5c3dc7f499")
+  batch          Batch?      @relation(fields: [batchId], references: [id], onDelete: SetNull, onUpdate: SetNull)
+  acceptance     Acceptance? @relation(fields: [acceptanceId], references: [id], onDelete: SetNull, onUpdate: SetNull)
+
+  @@index([itemId, itemIndex, orderId])
+  @@index([itemId, itemIndex, orderId, date])
+  @@map("item_actions_log")
+}
+
+model migrations {
+  id        Int    @id(map: "PK_8c82d7f526340ab734260ea46be") @default(autoincrement())
+  timestamp BigInt
+  name      String @db.VarChar
+}
+
+model Role {
+  id          String           @id(map: "PK_b36bcfe02fc8de3c57a8b2391c2") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name        String           @db.VarChar
+  permissions RolePermission[]
+  users       User[]
+
+  @@map("role")
+}
+
+model RolePermission {
+  id         String                     @id(map: "PK_96c8f1fd25538d3692024115b47") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  level      role_permission_level_enum
+  permission String                     @db.VarChar
+  roleId     String?                    @db.Uuid
+  role       Role?                      @relation(fields: [roleId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_e3130a39c1e4a740d044e685730")
+
+  @@map("role_permission")
+}
+
+model Stage {
+  id                                             String          @id(map: "PK_c54d11b3c24a188262844af1612") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name                                           String          @db.VarChar
+  color                                          String          @db.VarChar
+  requiredStatuses                               String[]
+  expiresIn                                      Int
+  default                                        Boolean
+  index                                          Int
+  type                                           stage_type_enum @default(collect)
+  containers                                     Container[]
+  container_log_container_log_fromStageIdTostage ContainerLog[]  @relation("container_log_fromStageIdTostage")
+  container_log_container_log_toStageIdTostage   ContainerLog[]  @relation("container_log_toStageIdTostage")
+
+  @@map("stage")
+}
+
+model StoredItem {
+  id                       String              @id(map: "PK_73dacdec8cc40b4df873017f4ba") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  orderId                  Int
+  orderNumber              String              @db.VarChar
+  isActual                 Boolean             @default(true)
+  orderDate                DateTime            @db.Date
+  orderStatus              String              @db.VarChar
+  orderType                String              @db.VarChar
+  orderStatusComment       String?             @db.VarChar
+  site                     String              @db.VarChar
+  itemId                   Int
+  itemIndex                Int
+  itemName                 String              @db.VarChar
+  itemSku                  String?             @db.VarChar
+  itemSize                 String?             @db.VarChar
+  itemStatus               String              @db.VarChar
+  itemComment              String?             @db.VarChar
+  itemCount                Int
+  customerComment          String?             @db.VarChar
+  deliveryCode             String?             @db.VarChar
+  containerName            String?             @db.VarChar
+  itemUpdatedAt            DateTime?           @db.Timestamptz(6)
+  brand                    String              @db.VarChar
+  offerExternalId          String?             @db.VarChar
+  collection               String              @db.VarChar
+  category                 String              @db.VarChar
+  group                    String              @default("Нет группы") @db.VarChar
+  productType              String              @default("Нет типа") @db.VarChar
+  orderConfirmedAt         String?             @db.VarChar
+  orderIni                 String?             @db.VarChar
+  itemIni                  String?             @db.VarChar
+  itemBasePrice            Int                 @default(0)
+  isUrgent                 Boolean
+  storedAt                 DateTime            @default(now()) @db.Timestamp(6)
+  moyskladPositionId       String?             @db.VarChar
+  dtf                      Boolean             @default(false)
+  cut                      Boolean             @default(false)
+  containerId              String?             @db.Uuid
+  moyskladType             String?             @db.VarChar
+  paymentMethod            String?             @db.VarChar
+  noFilmComment            String?             @db.VarChar
+  failComment              String?             @db.VarChar
+  twisting                 Boolean?            @default(false)
+  wasFailed                Boolean?            @default(false)
+  notForSewing             Boolean?            @default(false)
+  availableForDigitalPrint Boolean?            @default(false)
+  dtfConsumption           Float?
+  sewBuyPrice              Float?
+  footerConsumption        Float?
+  kulirConsumption         Float?
+  doubleThreadConsumption  Float?
+  batchId                  String?             @db.Uuid
+  productionMethod         String?
+  active                   Boolean             @default(true)
+  isProduction             Boolean             @default(false)
+  limited                  Boolean             @default(false)
+  batch                    Batch?              @relation(fields: [batchId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "PK_57da3b830b57bec1fd329dcaf43")
+  container                Container?          @relation(fields: [containerId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_8b69d613226b52d811bfe15906f")
+  logs                     StoredItemLog[]
+  sewingItems              SewingItem[]
+  physicalItems            PhysicalItem[]      @relation(name: "storedItem")
+  pendingStoredItems       PhysicalItem[]      @relation(name: "pendingStoredItem")
+  collectionListDate       DateTime?
+  StatusChangeQueue        StatusChangeQueue[]
+  orderPacked              Boolean             @default(false)
+  orderAssembled           Boolean             @default(false)
+
+  @@index([orderStatus])
+  @@index([id, active, orderId])
+  @@index([orderId, orderNumber, active])
+  @@index([itemId, itemIndex, orderId])
+  @@index([offerExternalId, itemSku, itemStatus, id, isProduction, active, site])
+  @@index([active, itemStatus, isProduction, offerExternalId, id, site])
+  @@index([site, active, isProduction, itemStatus, notForSewing])
+  @@map("stored_item")
+}
+
+model StoredItemLog {
+  id         String     @id(map: "PK_cea0cfa434c0da67edc3442a428") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  createdAt  DateTime   @default(now()) @db.Timestamp(6)
+  updatedAt  DateTime   @default(now()) @db.Timestamp(6)
+  itemId     String     @db.Uuid
+  dtf        Boolean?
+  cut        Boolean?
+  userId     String?    @db.Uuid
+  twisting   Boolean?
+  storedItem StoredItem @relation(fields: [itemId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_bd5d8981aed851984b1c381bd2e")
+  user       User?      @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_75e66e5b62b5edcbe31cf65651b")
+
+  @@map("stored_item_log")
+}
+
+model Task {
+  id          String           @id(map: "PK_fb213f79ee45060ba925ecd576e") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  createdAt   DateTime         @default(now()) @db.Timestamp(6)
+  updatedAt   DateTime         @default(now()) @db.Timestamp(6)
+  name        String           @db.VarChar
+  data        Json
+  retries     Int              @default(0)
+  status      task_status_enum @default(CREATED)
+  eventId     String?          @db.VarChar
+  parentId    String?          @db.Uuid
+  parentRunId String?          @db.Uuid
+  isBig       Boolean          @default(false)
+  task        Task?            @relation("taskTotask_parentId", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_8c9920b5fb32c3d8453f64b705c")
+  parentRun   TaskRun?         @relation("task_parentRunIdTotask_run", fields: [parentRunId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_48c75f78c70ab6dfc646c93fa74")
+  parent      Task[]           @relation("taskTotask_parentId")
+  runs        TaskRun[]        @relation("taskTotask_run_taskId")
+
+  @@index([status, retries, isBig, createdAt])
+  @@index([createdAt], map: "task_createdat_index")
+  @@index([id])
+  @@map("task")
+}
+
+model TaskRun {
+  id         String               @id(map: "PK_36326cc52f4708f36ae4e6158cc") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  createdAt  DateTime             @default(now()) @db.Timestamp(6)
+  updatedAt  DateTime             @default(now()) @db.Timestamp(6)
+  status     task_run_status_enum
+  finishedAt DateTime?            @db.Timestamptz(6)
+  taskId     String?              @db.Uuid
+  task       Task?                @relation("taskTotask_run_taskId", fields: [taskId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_dad807e0562e20f2ccf739d7cde")
+  subtasks   Task[]               @relation("task_parentRunIdTotask_run")
+
+  @@index([taskId])
+  @@index([taskId], map: "task_run_taskid_index")
+  @@map("task_run")
+}
+
+model User {
+  id              String           @id(map: "PK_cace4a159ff9f2512dd42373760") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name            String           @db.VarChar
+  email           String           @db.VarChar
+  lastName        String           @db.VarChar
+  passwordHash    String           @db.VarChar
+  authId          String           @db.VarChar
+  createdAt       DateTime         @default(now()) @db.Timestamp(6)
+  updatedAt       DateTime         @default(now()) @db.Timestamp(6)
+  roleId          String?          @db.Uuid
+  isSystem        Boolean          @default(false)
+  role            Role?            @relation(fields: [roleId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_c28e52f758e7bbc53828db92194")
+  active          Boolean          @default(true)
+  acceptances     Acceptance[]
+  acceptanceLogs  AcceptanceLog[]
+  batches         Batch[]
+  batchLogs       BatchLog[]
+  containerLogs   ContainerLog[]
+  itemActionsLogs ItemActionsLog[]
+  storedItemLogs  StoredItemLog[]
+  extraPressLogs  ExtraPressLog[]
+
+  PhysicalItem                  PhysicalItem[]
+  PhysicalItemLog               PhysicalItemLog[]
+  physicalItemMovementDocuments PhysicalItemMovementDocument[]
+  cells                         StoreCell[]
+  AssortmentLog                 AssortmentLog[]
+  StatusChangeQueue             StatusChangeQueue[]
+
+  @@map("user")
+}
+
+model container_tags_container_tag {
+  containerId    String       @db.Uuid
+  containerTagId String       @db.Uuid
+  container      Container    @relation("containerTocontainer_tags_container_tag", fields: [containerId], references: [id], onDelete: Cascade, map: "FK_30168a281a366643304c7e72ce8")
+  container_tag  ContainerTag @relation("container_tagTocontainer_tags_container_tag", fields: [containerTagId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_28ecf01cd031a10088c2389c874")
+
+  @@id([containerId, containerTagId], map: "PK_60da5281e4c3ef10d66227ffc61")
+  @@index([containerTagId], map: "IDX_28ecf01cd031a10088c2389c87")
+  @@index([containerId], map: "IDX_30168a281a366643304c7e72ce")
+}
+
+model stage_type {
+  id      Int     @id(map: "PK_6b9b1c1938f4ff5d6dd36dd0908") @default(autoincrement())
+  name    String  @db.VarChar
+  default Boolean @default(false)
+}
+
+model ExtraPressLog {
+  id             String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  itemName       String
+  pressCount     Int      @default(1)
+  positionsCount Int      @default(1)
+  shop           String?
+  departament    String?
+  date           DateTime @default(now())
+  userId         String   @db.Uuid
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model ProductGroup {
+  id   String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name String
+
+  pathName   String?
+  externalId String  @unique
+
+  parent   ProductGroup? @relation(fields: [parentId], references: [id], name: "parent")
+  parentId String?       @db.Uuid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  products Product[]
+  children ProductGroup[] @relation("parent")
+
+  moyskladLinks MoyskladLink[]
+}
+
+model PriceType {
+  id String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+
+  name       String
+  externalId String @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  prices          ProductPrice[]      @relation("priceType")
+  relativePrices  ProductPrice[]      @relation("relativePriceType")
+  mPrices         ModificationPrice[] @relation("priceModificationType")
+  relativeMPrices ModificationPrice[] @relation("relativeModificationPriceType")
+  preset          PriceTypePreset?
+  index           Int                 @default(0)
+
+  moyskladLinks MoyskladLink[]
+}
+
+enum PriceTypePreset {
+  PRIME
+  DROPSHIPPING
+  TECH
+  SEW_BUY
+  BUY
+}
+
+model ProductPrice {
+  type    PriceType @relation("priceType", fields: [priceTypeId], references: [id], onDelete: Cascade)
+  product Product   @relation("product", fields: [productId], references: [id], onDelete: Cascade)
+  value   Float
+
+  relative            Boolean            @default(false)
+  targetProduct       Product?           @relation("productRelativePriceProduct", fields: [targetProductId], references: [id])
+  targetModification  Modification?      @relation("productRelativePriceModification", fields: [targetModificationId], references: [id])
+  targetType          PriceType?         @relation("relativePriceType", fields: [targetTypeId], references: [id])
+  relationType        PriceRelationType?
+  relationChangeValue Float?
+
+  targetTypeId         String? @db.Uuid
+  targetProductId      String? @db.Uuid
+  targetModificationId String? @db.Uuid
+  priceTypeId          String  @db.Uuid
+  productId            String  @db.Uuid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([priceTypeId, productId], name: "key")
+}
+
+enum PriceRelationType {
+  EQUAL
+  INCREMENT
+  DECREMENT
+  DIVIDE
+  MULTIPLY
+}
+
+model ModificationPrice {
+  type         PriceType    @relation("priceModificationType", fields: [priceTypeId], references: [id], onDelete: Cascade)
+  modification Modification @relation("modification", fields: [modificationId], references: [id], onDelete: Cascade)
+  value        Float
+
+  priceTypeId    String @db.Uuid
+  modificationId String @db.Uuid
+
+  relative            Boolean            @default(false)
+  targetType          PriceType?         @relation("relativeModificationPriceType", fields: [targetTypeId], references: [id])
+  targetModification  Modification?      @relation("modificationPriceTargetModification", fields: [targetModificationId], references: [id])
+  targetProduct       Product?           @relation("modificationPriceTargetProduct", fields: [targetProductId], references: [id])
+  relationType        PriceRelationType?
+  relationChangeValue Float?
+
+  targetTypeId         String? @db.Uuid
+  targetModificationId String? @db.Uuid
+  targetProductId      String? @db.Uuid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([priceTypeId, modificationId], name: "key")
+}
+
+model CustomEntity {
+  id   String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name String @default("")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  values        CustomEntityValue[]
+  CustomField   CustomField[]
+  moyskladLinks MoyskladLink[]
+}
+
+model CustomEntityValue {
+  id String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+
+  value      String
+  code       String?
+  externalId String  @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  customEntity   CustomEntity @relation(fields: [customEntityId], references: [id], onDelete: Cascade)
+  customEntityId String       @db.Uuid
+
+  CustomFieldValue CustomFieldValue[]
+  moyskladLinks    MoyskladLink[]
+}
+
+model CustomField {
+  id   String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name String
+
+  type   CustomFieldType
+  preset AssortmentFieldPreset?
+
+  index Int @default(0)
+
+  required Boolean @default(false)
+
+  customEntity   CustomEntity? @relation(fields: [customEntityId], references: [id], onDelete: Cascade)
+  customEntityId String?       @db.Uuid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  values        CustomFieldValue[]
+  moyskladLinks MoyskladLink[]
+}
+
+enum AssortmentFieldPreset {
+  SIZE
+  COLOR
+  CRM_EXPORT
+  BRAND
+  COLLECTION
+  CATEGORY
+  PRODUCTION_METHOD
+  PRESS_COUNT
+  PRODUCT_TYPE
+  NOT_FOR_SEWING
+  DIGITAL_PRINT
+  FIRST_STEP
+  SECOND_STEP
+  THIRD_STEP
+  KULIR_CONSUMPTION
+  DOUBLE_THREAD_CONSUMPTION
+  DTF_CONSUMPTION
+  FOOTER_CONSUMPTION
+  LIMITED
+  BASE_ARTICLE
+  BOOK_VOLUME
+}
+
+enum CustomFieldType {
+  STRING
+  NUMBER
+  BOOLEAN
+  CUSTOM
+  DATE
+}
+
+model CustomFieldValue {
+  customField CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+  product     Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  stringValue         String             @default("")
+  dateValue           DateTime           @default(now())
+  numericValue        Float              @default(0)
+  boolValue           Boolean            @default(false)
+  customEntityValue   CustomEntityValue? @relation(fields: [customEntityValueId], references: [id], onDelete: Cascade)
+  customEntityValueId String?            @db.Uuid
+
+  customFieldId String @db.Uuid
+  productId     String @db.Uuid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([customFieldId, productId], name: "key")
+}
+
+model ProductInfo {
+  id                       String            @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name                     String
+  externalId               String
+  xmlId                    String
+  article                  String?
+  baseArticle              String?
+  notForSewing             Boolean           @default(false)
+  archived                 Boolean           @default(false)
+  limited                  Boolean           @default(false)
+  availableForDigitalPrint Boolean           @default(false)
+  status                   ProductInfoStatus @default(NORMAL)
+  stockCount               Int               @default(0)
+  outsourceCount           Int               @default(0)
+  purchasePrice            Float             @default(0)
+  sewBuyPrice              Float?            @default(0)
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+
+  firstStep  String?
+  secondStep String?
+  thirdStep  String?
+  dtf        Boolean @default(false)
+  cut        Boolean @default(false)
+
+  brand       String?
+  category    String?
+  collection  String?
+  productType String?
+
+  images String[] @default([])
+
+  footerConsumption       Float? @default(0)
+  doubleThreadConsumption Float? @default(0)
+  kulirConsumption        Float? @default(0)
+  dtfConsumption          Float? @default(0)
+
+  @@unique([externalId, article, status], name: "key")
+}
+
+enum ProductInfoStatus {
+  NORMAL
+  NEXTGEN
+  OUTDATED
+}
+
+model Product {
+  id String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+
+  images String[]
+
+  name        String
+  description String @default("")
+
+  weight Float?
+  volume Float?
+
+  article    String?
+  externalId String  @unique
+
+  archived Boolean @default(false)
+
+  group          ProductGroup? @relation(fields: [productGroupId], references: [id])
+  productGroupId String?       @db.Uuid
+
+  prices ProductPrice[] @relation("product")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  modifications     Modification[]
+  fields            CustomFieldValue[]
+  logs              AssortmentLog[]
+  ModificationPrice ModificationPrice[] @relation("modificationPriceTargetProduct")
+  relativePrices    ProductPrice[]      @relation("productRelativePriceProduct")
+
+  moyskladLinks MoyskladLink[]
+}
+
+model Modification {
+  id String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+
+  images String[]
+
+  name        String
+  description String @default("")
+
+  article    String
+  externalId String @unique
+
+  archived Boolean @default(false)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  base   Modification? @relation(fields: [baseId], references: [id], name: "baseModification", onDelete: SetNull)
+  baseId String?       @db.Uuid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  baseOfModifications Modification[]                    @relation(name: "baseModification")
+  prices              ModificationPrice[]               @relation(name: "modification")
+  productId           String                            @db.Uuid
+  logs                AssortmentLog[]
+  characteristics     ModificationCharacteristicValue[]
+  ModificationPrice   ModificationPrice[]               @relation(name: "modificationPriceTargetModification")
+  ProductPrice        ProductPrice[]                    @relation("productRelativePriceModification")
+  structure           ModificationStructure[]
+
+  moyskladLinks MoyskladLink[]
+}
+
+model ModificationStructure {
+  id String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+
+  modification   Modification @relation(fields: [modificationId], references: [id], onDelete: Cascade)
+  modificationId String       @db.Uuid
+
+  value String
+  count String @default("1")
+}
+
+model ModificationCharacteristic {
+  id     String                 @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  preset AssortmentFieldPreset?
+
+  name String
+
+  createdAt                       DateTime                          @default(now())
+  updatedAt                       DateTime                          @default(now()) @updatedAt
+  ModificationCharacteristicValue ModificationCharacteristicValue[]
+  moyskladLinks                   MoyskladLink[]
+}
+
+model ModificationCharacteristicValue {
+  modification                 Modification               @relation(fields: [modificationId], references: [id], onDelete: Cascade)
+  characteristic               ModificationCharacteristic @relation(fields: [modificationCharacteristicId], references: [id], onDelete: Cascade)
+  value                        String
+  modificationId               String                     @db.Uuid
+  modificationCharacteristicId String                     @db.Uuid
+
+  @@unique([modificationId, modificationCharacteristicId], name: "key")
+}
+
+model PhysicalItem {
+  id    String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  store Store
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  productExternalCode String?
+  productArticle      String?
+  productName         String
+
+  comment String?
+
+  reservedFrom Store?
+
+  storeCell        StoreCell? @relation(fields: [storeCellId], references: [id])
+  storeCellComment String?
+
+  user   User?   @relation(fields: [userId], references: [id])
+  userId String? @db.Uuid
+
+  storedItem   StoredItem? @relation(name: "storedItem", fields: [storedItemId], references: [id])
+  storedItemId String?     @db.Uuid
+
+  pendingStoredItem   StoredItem? @relation(name: "pendingStoredItem", fields: [pendingStoredItemId], references: [id])
+  pendingStoredItemId String?     @db.Uuid
+
+  sewingItem   SewingItem?       @relation(fields: [sewingItemId], references: [id])
+  sewingItemId String?           @unique @db.Uuid
+  logs         PhysicalItemLog[]
+  shipmentId   String?           @db.Uuid
+  storeCellId  String?           @db.Uuid
+  units        String?
+
+  @@index([id, pendingStoredItemId, store])
+  @@index([pendingStoredItemId, store])
+}
+
+model PhysicalItemLog {
+  id String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+
+  physicalItem   PhysicalItem? @relation(fields: [physicalItemId], references: [id])
+  physicalItemId String?       @db.Uuid
+
+  productName         String
+  productArticle      String?
+  productExternalCode String
+
+  context Json?
+
+  comment          String?
+  storeCell        StoreCell? @relation(fields: [storeCellId], references: [id])
+  storeCellId      String?    @db.Uuid
+  storeCellComment String?
+
+  user   User?   @relation(fields: [userId], references: [id])
+  userId String? @db.Uuid
+
+  action PhysicalItemLogAction
+
+  sourceAction String?
+
+  sourceStore Store?
+  targetStore Store?
+
+  createdAt                      DateTime                      @default(now())
+  updatedAt                      DateTime                      @default(now()) @updatedAt
+  physicalItemMovementDocument   PhysicalItemMovementDocument? @relation(fields: [physicalItemMovementDocumentId], references: [id])
+  physicalItemMovementDocumentId String?                       @db.Uuid
+}
+
+model AssortmentLog {
+  id String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+
+  user         User          @relation(fields: [userId], references: [id])
+  product      Product?      @relation(fields: [productId], references: [id])
+  modification Modification? @relation(fields: [modificationId], references: [id])
+
+  changedFields Json[]
+  type          AssortmentLogType
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  userId         String  @db.Uuid
+  productId      String? @db.Uuid
+  modificationId String? @db.Uuid
+}
+
+enum AssortmentLogType {
+  CREATE
+  UPDATE
+}
+
+enum PhysicalItemLogAction {
+  CREATE
+  MOVE
+  TRANSFORM
+  CONNECT
+  CONNECT_PENDING
+  DISCONNECT
+  DISCONNECT_PENDING
+  DELETE
+  COMMENT
+  INVENTORY
+}
+
+model SewingItem {
+  id String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+
+  batch   Batch  @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  batchId String @db.Uuid
+
+  acceptance   Acceptance? @relation(fields: [acceptanceId], references: [id])
+  acceptanceId String?     @db.Uuid
+
+  storedItem   StoredItem? @relation(fields: [storedItemId], references: [id])
+  storedItemId String?     @db.Uuid
+
+  physicalItem PhysicalItem?
+
+  productExternalCode String?
+  productArticle      String?
+  productName         String
+
+  status SewingItemStatus @default(CUT)
+
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @default(now()) @updatedAt
+  AcceptanceLog AcceptanceLog[]
+}
+
+model PhysicalItemMovementDocument {
+  id String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+
+  number  Int                              @default(autoincrement())
+  type    PhysicalItemMovementDocumentType
+  comment String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id])
+
+  logs PhysicalItemLog[]
+}
+
+enum PhysicalItemMovementDocumentType {
+  ENTER
+  LOSS
+  MOVE
+  INVENTORY
+}
+
+model StoreCell {
+  id String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+
+  name  String
+  store Store
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  userId          String            @db.Uuid
+  user            User              @relation(fields: [userId], references: [id])
+  PhysicalItem    PhysicalItem[]
+  PhysicalItemLog PhysicalItemLog[]
+}
+
+enum SewingItemStatus {
+  CUT
+  SEWING
+  PREPARED_FOR_ACCEPTANCE
+  WAITING_ACCEPTANCE
+  COLLECTED
+  FAILED_REMAKE
+  FAILED_SHOP
+  FAILED_CUSTOM
+  FAILED_DAMAGED
+  FAILED_DISCOUNT
+}
+
+model StatusChangeQueue {
+  id String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+
+  updateData Json
+
+  orderId   Int
+  itemId    Int
+  itemIndex Int
+
+  user User @relation(fields: [userId], references: [id])
+
+  createdAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  error        String?
+  userId       String      @db.Uuid
+  storedItem   StoredItem? @relation(fields: [storedItemId], references: [id])
+  storedItemId String?     @db.Uuid
+
+  @@index([createdAt, finishedAt])
+}
+
+model MoyskladAccount {
+  id String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+
+  name  String
+  token String
+
+  primary Boolean @default(false)
+
+  currencyMoyskladId String?
+
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @default(now()) @updatedAt
+  moyskladLinks MoyskladLink[]
+}
+
+model MoyskladLink {
+  id String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+
+  account           MoyskladAccount @relation(fields: [moyskladAccountId], references: [id])
+  moyskladAccountId String          @db.Uuid
+
+  entityMoyskladId String
+  entityType       MoyskladEntityType
+
+  product                    Product?                    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  modification               Modification?               @relation(fields: [modificationId], references: [id], onDelete: SetNull)
+  group                      ProductGroup?               @relation(fields: [productGroupId], references: [id], onDelete: SetNull)
+  priceType                  PriceType?                  @relation(fields: [priceTypeId], references: [id], onDelete: SetNull)
+  customField                CustomField?                @relation(fields: [customFieldId], references: [id], onDelete: SetNull)
+  customEntity               CustomEntity?               @relation(fields: [customEntityId], references: [id], onDelete: SetNull)
+  customEntityValue          CustomEntityValue?          @relation(fields: [customEntityValueId], references: [id], onDelete: SetNull)
+  modificationCharacteristic ModificationCharacteristic? @relation(fields: [modificationCharacteristicId], references: [id], onDelete: SetNull)
+
+  productId                    String? @db.Uuid
+  modificationId               String? @db.Uuid
+  productGroupId               String? @db.Uuid
+  priceTypeId                  String? @db.Uuid
+  customFieldId                String? @db.Uuid
+  customEntityId               String? @db.Uuid
+  customEntityValueId          String? @db.Uuid
+  modificationCharacteristicId String? @db.Uuid
+}
+
+model MoyskladChange {
+  id String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+
+  action     MoyskladChangeAction
+  entityType MoyskladEntityType
+  entityId   String
+
+  executedAt DateTime?
+  error      String?
+
+  linkIds String[] @default([])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([action, entityId, entityType, executedAt])
+}
+
+enum MoyskladChangeAction {
+  UPSERT
+  DELETE
+}
+
+enum MoyskladEntityType {
+  PRODUCT
+  MODIFICATION
+  GROUP
+  PRICE_TYPE
+  CUSTOM_FIELD
+  CUSTOM_ENTITY
+  CUSTOM_ENTITY_VALUE
+  MODIFICATION_CHARACTERISTIC
+}
+
+enum Contractor {
+  WORKSHOP
+  OUTSOURCE
+}
+
+enum Store {
+  WORKSHOP
+  BASE
+  RESERVE
+  TRANSIT_POINT
+  SECOND_LINE
+  CUSTOM
+  CUSTOM_RESERVE
+  PRODUCTION
+  READY
+  FAIL
+  SOLD
+  BUFFER
+  FLACON
+  CDM
+  CDM_CUSTOM
+  OHOTNIY
+  VINZAVOD
+  AVIAPARK
+  METROPOLIS
+  ATRIUM
+  ETAGHI
+  DESIGN
+  FORMATICA_BASE
+  WILDBERRIES
+  ONLINE_SHOPS_MATERIAL
+  OFFLINE_SHOPS_MATERIAL
+  FORMATICA_BASE_MATERIAL
+  WILDBERRIES_MATERIAL
+}
+
+enum acceptance_item_status_enum {
+  added
+  collected
+  remake
+  shop
+  custom
+}
+
+enum container_type_enum {
+  default
+  urgent
+}
+
+enum role_permission_level_enum {
+  read
+  write
+}
+
+enum stage_type_enum {
+  collect
+  print
+  pack
+  delivery
+  film
+}
+
+enum task_run_status_enum {
+  created
+  running
+  done
+  error
+}
+
+enum BatchStatus {
+  CREATED
+  SEWN
+  PREPARED_FOR_ACCEPTANCE
+  WAITING_ACCEPTANCE
+  ACCEPTED
+  ACCEPTED_PARTIALLY
+  REJECTED
+}
+
+enum MaterialStatus {
+  CREATED
+  PAYMENT
+  DELYVERY
+  ACCEPT
+  OLD
+}
+
+enum task_status_enum {
+  CREATED
+  RUNNING
+  SUCCESS
+  ERROR
+}
+
+enum batch_type_enum {
+  default
+  defect
+}
+
+enum materialStore {
+  ONLINE_SHOPS_MATERIAL
+  OFFLINE_SHOPS_MATERIAL
+  FORMATICA_BASE_MATERIAL
+  WILDBERRIES_MATERIAL
+}
+
+enum materialUnits {
+  wt
+  quantity
+}

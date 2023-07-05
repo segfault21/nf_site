@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "ProductInfo" ALTER COLUMN "sewBuyPrice" SET DATA TYPE DOUBLE PRECISION;
